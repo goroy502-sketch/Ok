@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView Multi-Pattern & SMC Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #131722; color: #d1d4dc; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Main Chart Area */
+        .main-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; }
+        
+        /* Top Toolbar */
+        .toolbar { height: 50px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; padding: 0 15px; gap: 15px; }
+        .toolbar select, .toolbar button { background: #2a2e39; color: #d1d4dc; border: 1px solid #363a45; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .toolbar select:hover, .toolbar button:hover { background: #363a45; }
+        .ticker-info { display: flex; gap: 15px; font-size: 13px; font-weight: 600; }
+        .price-up { color: #089981; }
+        .price-down { color: #f23645; }
+
+        /* Canvas Container */
+        .chart-container { flex: 1; position: relative; background: #131722; cursor: crosshair; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* Sidebar Panel */
+        .sidebar { width: 340px; background: #1e222d; border-left: 1px solid #2a2e39; display: flex; flex-direction: column; height: 100%; }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 10px; }
+        .sidebar-header h2 { font-size: 15px; color: #s; display: flex; align-items: center; gap: 8px; color: #fff; }
+        
+        /* Search Bar */
+        .search-box { width: 100%; background: #131722; border: 1px solid #363a45; border-radius: 4px; padding: 8px 12px; color: #fff; font-size: 13px; outline: none; }
+        .search-box:focus { border-color: #2962ff; }
+
+        /* Categories & Checkboxes */
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 10px 15px; }
+        .category-group { margin-bottom: 15px; }
+        .category-title { font-size: 12px; font-weight: 700; color: #848e9c; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #2a2e39; }
+        
+        .checkbox-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; cursor: pointer; }
+        .checkbox-item:hover { color: #fff; }
+        .checkbox-left { display: flex; align-items: center; gap: 10px; }
+        .checkbox-item input { accent-color: #2962ff; width: 15px; height: 15px; cursor: pointer; }
+        
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+        .badge-bull { background: rgba(8, 153, 129, 0.2); color: #089981; }
+        .badge-bear { background: rgba(242, 54, 69, 0.2); color: #f23645; }
+        .badge-neutral { background: rgba(132, 142, 156, 0.2); color: #848e9c; }
+
+        /* Bottom Status bar */
+        .status-bar { height: 35px; background: #1e222d; border-top: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-size: 12px; color: #848e9c; }
+    </style>
+</head>
+<body>
+
+    <!-- Main Chart Section -->
+    <div class="main-container">
+        <div class="toolbar">
+            <select id="coinSelect" onchange="changeCoin()">
+                <option value="BTCUSDT">₿ BTC/USDT (Binance)</option>
+                <option value="ETHUSDT">Ξ ETH/USDT (Binance)</option>
+                <option value="SOLUSDT">◎ SOL/USDT (Binance)</option>
+                <option value="BNBUSDT"> BNB/USDT (Binance)</option>
+            </select>
+            <div class="ticker-info">
+                <span id="tickerPrice" class="price-up">67,420.12 USD</span>
+                <span id="tickerChange" class="price-up">+192.18 (+0.28%)</span>
+            </div>
+            <button onclick="resetZoom()">Reset View</button>
+        </div>
+
+        <div class="chart-container" id="chartBox">
+            <canvas id="tradingCanvas"></canvas>
+        </div>
+
+        <div class="status-bar">
+            <span>Status: Live Market Feed Connected</span>
+            <span id="activeCount">Active Patterns: All Enabled</span>
+        </div>
+    </div>
+
+    <!-- Sidebar Control Panel -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>📊 Pattern Analysis Dashboard</h2>
+            <input type="text" id="searchInput" class="search-box" placeholder="Search patterns or indicators..." onkeyup="filterPatterns()">
+        </div>
+
+        <div class="sidebar-content" id="sidebarContent">
+            <!-- 1. Candlestick Patterns -->
+            <div class="category-group" data-category="candlestick">
+                <div class="category-title">1. Candlestick Chart Patterns</div>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Hammer"> Hammer</span><span class="badge badge-bull">Bullish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Inverted Hammer"> Inverted Hammer</span><span class="badge badge-neutral">Potential</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Bullish Engulfing"> Bullish Engulfing</span><span class="badge badge-bull">Strong</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Morning Star"> Morning Star</span><span class="badge badge-bull">Bullish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Shooting Star"> Shooting Star</span><span class="badge badge-bear">Bearish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Bearish Engulfing"> Bearish Engulfing</span><span class="badge badge-bear">Strong</span></label>
+            </div>
+
+            <!-- 2. Classic Patterns -->
+            <div class="category-group" data-category="classic">
+                <div class="category-title">2. Classic Chart Patterns</div>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Head and Shoulders"> Head & Shoulders</span><span class="badge badge-bear">Bearish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Inverse Head and Shoulders"> Inverse H&S</span><span class="badge badge-bull">Bullish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Double Top"> Double Top</span><span class="badge badge-bear">Bearish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Double Bottom"> Double Bottom</span><span class="badge badge-bull">Bullish</span></label>
+            </div>
+
+            <!-- 3. Triangle & Flags -->
+            <div class="category-group" data-category="triangles">
+                <div class="category-title">3. Triangle & Flag Patterns</div>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Descending Triangle"> Descending Triangle</span><span class="badge badge-bear">Bearish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Ascending Triangle"> Ascending Triangle</span><span class="badge badge-bull">Bullish</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Bull Flag"> Bull Flag</span><span class="badge badge-bull">Continuation</span></label>
+            </div>
+
+            <!-- 4. Smart Money Concepts -->
+            <div class="category-group" data-category="smc">
+                <div class="category-title">4. Smart Money Concepts (SMC)</div>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Order Block"> Order Block (OB)</span><span class="badge badge-bull">Supply/Demand</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Fair Value Gap"> Fair Value Gap (FVG)</span><span class="badge badge-neutral">Imbalance</span></label>
+                <label class="checkbox-item"><span class="checkbox-left"><input type="checkbox" checked data-pattern="Liquidity Sweep"> Liquidity Sweep</span><span class="badge badge-bear">Stop Grab</span></label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('tradingCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resizeCanvas() {
+            width = canvas.parentElement.clientWidth;
+            height = canvas.parentElement.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            drawChart();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        let candles = [];
+        for(let i=0; i<60; i++) {
+            let o = 65000 + Math.sin(i*0.3)*2000 + Math.random()*500;
+            let c = o + (Math.random()-0.48)*800;
+            let h = Math.max(o, c) + Math.random()*400;
+            let l = Math.min(o, c) - Math.random()*400;
+            candles.push({o, h, l, c});
+        }
+
+        function drawChart() {
+            ctx.clearRect(0, 0, width, height);
+            let barWidth = width / candles.length;
+
+            // Draw grid lines
+            ctx.strokeStyle = '#2a2e39';
+            ctx.lineWidth = 1;
+            for(let i=0; i<width; i+=60) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+            }
+
+            // Draw Candles
+            candles.forEach((candle, idx) => {
+                let x = idx * barWidth + barWidth/2;
+                let isGreen = candle.c >= candle.o;
+                ctx.strokeStyle = isGreen ? '#089981' : '#f23645';
+                ctx.fillStyle = isGreen ? '#089981' : '#f23645';
+
+                // Wick
+                ctx.beginPath(); ctx.moveTo(x, 100 + (72000 - candle.h)*0.01); ctx.lineTo(x, 100 + (72000 - candle.l)*0.01); ctx.stroke();
+                // Body
+                let bodyTop = 100 + (72000 - Math.max(candle.o, candle.c))*0.01;
+                let bodyHeight = Math.abs(candle.c - candle.o)*0.01;
+                ctx.fillRect(x - barWidth*0.35, bodyTop, barWidth*0.7, Math.max(bodyHeight, 1));
+            });
+
+            // Check checked boxes and render pattern overlays accordingly
+            let checkboxes = document.querySelectorAll('.sidebar-content input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                if(cb.checked) {
+                    renderPatternOverlay(cb.getAttribute('data-pattern'));
+                }
+            });
+        }
+
+        function renderPatternOverlay(patternName) {
+            ctx.lineWidth = 2;
+            if(patternName === 'Double Bottom') {
+                ctx.strokeStyle = '#089981';
+                ctx.fillStyle = 'rgba(8, 153, 129, 0.15)';
+                ctx.beginPath(); ctx.rect(50, 450, 200, 80); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif';
+                ctx.fillText('Double Bottom (Bullish)', 60, 475);
+            }
+            if(patternName === 'Head and Shoulders') {
+                ctx.strokeStyle = '#f23645';
+                ctx.fillStyle = 'rgba(242, 54, 69, 0.15)';
+                ctx.beginPath(); ctx.rect(200, 80, 220, 100); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif';
+                ctx.fillText('Head & Shoulders (Bearish)', 210, 105);
+            }
+            if(patternName === 'Bull Flag') {
+                ctx.strokeStyle = '#089981';
+                ctx.fillStyle = 'rgba(8, 153, 129, 0.15)';
+                ctx.beginPath(); ctx.rect(450, 350, 120, 90); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif';
+                ctx.fillText('Bull Flag (Bullish)', 460, 375);
+            }
+        }
+
+        function filterPatterns() {
+            let query = document.getElementById('searchInput').value.toLowerCase();
+            let groups = document.querySelectorAll('.category-group');
+            groups.forEach(group => {
+                let items = group.querySelectorAll('.checkbox-item');
+                let matchCount = 0;
+                items.forEach(item => {
+                    let text = item.innerText.toLowerCase();
+                    if(text.includes(query)) {
+                        item.style.display = 'flex';
+                        matchCount++;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                group.style.display = matchCount > 0 ? 'block' : 'none';
+            });
+        }
+
+        function changeCoin() {
+            let coin = document.getElementById('coinSelect').value;
+            document.getElementById('tickerPrice').innerText = coin === 'ETHUSDT' ? '3,540.50 USD' : coin === 'SOLUSDT' ? '185.20 USD' : '67,420.12 USD';
+            drawChart();
+        }
+
+        function resetZoom() { drawChart(); }
+
+        // Live checkbox event listener to re-render chart instantly
+        document.querySelectorAll('.sidebar-content input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', drawChart);
+        });
+
+        resizeCanvas();
+    </script>
+</body>
+</html>
